@@ -208,7 +208,7 @@ Cài đặt cơ bản:
 pip install fer deepface
 
 Cài đặt đầy đủ (tất cả models):
-pip install fer deepface mediapipe transformers facenet-pytorch torch dlib tensorflow
+
 
 Hoặc từ file requirements:
 pip install -r requirements.txt

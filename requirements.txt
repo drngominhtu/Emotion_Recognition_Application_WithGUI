@@ -1,0 +1,14 @@
+opencv-python==4.8.1.78
+tensorflow==2.15.0
+pillow==10.2.0
+numpy==1.24.3
+fer==22.5.1
+deepface==0.0.79
+torch
+torchvision
+transformers
+facenet-pytorch
+mediapipe
+dlib
+scikit-learn
+keras

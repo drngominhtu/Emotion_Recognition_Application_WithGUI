@@ -56,32 +56,40 @@ class EmotionRecognitionApp:
         main_frame.grid_columnconfigure(0, weight=2)  # Left side (video) - wider
         main_frame.grid_columnconfigure(1, weight=1)  # Right side (emotion panel)
         
-        # 1. Control Panel - Top row, spanning both columns
-        self.control_panel = ControlPanel(
-            main_frame,
-            self.main_window.model_var,
-            self.main_window.status_var
-        )
-        # Place control panel at top, spanning full width
-        # Control panel will handle its own grid placement
+        # Create frames for better organization
+        left_frame = tk.Frame(main_frame)
+        left_frame.grid(row=0, column=0, rowspan=3, sticky="nsew", padx=(5, 10), pady=5)
+        left_frame.grid_rowconfigure(1, weight=1)
+        left_frame.grid_columnconfigure(0, weight=1)
         
-        # 2. Video Display - Left side of content area
-        self.video_display = VideoDisplay(main_frame)
-        # Video display will handle its own grid placement
+        right_frame = tk.Frame(main_frame)
+        right_frame.grid(row=0, column=1, rowspan=3, sticky="ns", padx=(10, 5), pady=5)
         
-        # 3. Emotion Panel - Right side of content area  
+        # Video display - place in left frame
+        self.video_display = VideoDisplay(left_frame)
+        
+        # Emotion panel - place below video display in left frame
         self.emotion_panel = EmotionPanel(
-            main_frame,
+            left_frame,
             self.main_window.emotion_var,
             self.main_window.confidence_var
         )
-        # Emotion panel will handle its own grid placement
+        
+        # Control panel - place in right frame
+        self.control_panel = ControlPanel(
+            right_frame,
+            self.main_window.model_var,
+            self.main_window.status_var
+        )
         
         # Set button commands
         self.control_panel.set_button_commands(
             self.toggle_stream,
             self.toggle_recording
         )
+        
+        # Pass camera handler to control panel
+        self.control_panel.set_camera_handler(self.camera_handler)
         
         # Pass model manager to control panel for status window
         self.control_panel.set_model_manager(self.model_manager)
@@ -114,32 +122,61 @@ class EmotionRecognitionApp:
             messagebox.showerror("Lỗi", "Vui lòng chọn model nhận dạng!")
             return
         
-        # Start camera
-        if not self.camera_handler.start_camera(config.CAMERA_INDEX):
-            messagebox.showerror("Lỗi", "Không thể mở camera!")
-            return
+        # Get camera selection
+        camera_selection = self.control_panel.camera_var.get()
+        
+        # Start camera with retry
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                if self.camera_handler.start_camera(camera_selection):
+                    break
+                else:
+                    if attempt < max_retries - 1:
+                        print(f"Camera attempt {attempt + 1} failed, retrying...")
+                        time.sleep(1)
+                    else:
+                        messagebox.showerror("Lỗi", f"Không thể mở camera: {camera_selection}\n\nHãy thử:\n• Camera khác\n• Kiểm tra đường dẫn\n• Đóng ứng dụng khác đang dùng camera\n• Khởi động lại ứng dụng")
+                        return
+            except Exception as e:
+                print(f"Camera start attempt {attempt + 1} error: {e}")
+                if attempt == max_retries - 1:
+                    messagebox.showerror("Lỗi", f"Lỗi camera: {str(e)}")
+                    return
         
         # Start streaming
-        if self.camera_handler.start_streaming(self.process_frame):
-            self.is_streaming = True
-            self.control_panel.update_start_button("Dừng")
-            self.main_window.status_var.set("Đang stream...")
-        else:
-            messagebox.showerror("Lỗi", "Không thể bắt đầu stream!")
+        try:
+            if self.camera_handler.start_streaming(self.process_frame):
+                self.is_streaming = True
+                self.control_panel.update_start_button("Dừng")
+                self.main_window.status_var.set("Đang stream...")
+            else:
+                messagebox.showerror("Lỗi", "Không thể bắt đầu stream!")
+        except Exception as e:
+            messagebox.showerror("Lỗi", f"Lỗi khởi động stream: {str(e)}")
     
     def stop_stream(self):
         """Stop video streaming"""
-        self.is_streaming = False
-        self.camera_handler.stop_streaming()
-        self.camera_handler.stop_camera()
-        
-        self.control_panel.update_start_button("Bắt đầu")
-        self.main_window.status_var.set("Đã dừng")
-        
-        # Stop recording if active
-        if self.video_recorder.is_recording_active():
-            self.stop_recording()
-    
+        try:
+            self.is_streaming = False
+            
+            # Stop streaming first
+            self.camera_handler.stop_streaming()
+            
+            # Then stop camera
+            self.camera_handler.stop_camera()
+            
+            self.control_panel.update_start_button("Bắt đầu")
+            self.main_window.status_var.set("Đã dừng")
+            
+            # Stop recording if active
+            if self.video_recorder.is_recording_active():
+                self.stop_recording()
+                
+        except Exception as e:
+            print(f"Error stopping stream: {e}")
+            messagebox.showerror("Lỗi", f"Lỗi dừng stream: {str(e)}")
+
     def toggle_recording(self):
         """Toggle video recording on/off"""
         if not self.video_recorder.is_recording_active():
@@ -336,37 +373,69 @@ Bạn có muốn mở thư mục output?"""
 
     def process_frame(self, frame):
         """Process each video frame"""
-        # Get selected model
-        selected_model = self.main_window.model_var.get()
-        
-        # Detect emotion
-        emotion, confidence, faces = self.model_manager.detect_emotion(selected_model, frame)
-        
-        # Log emotion data if logging is active
-        if self.emotion_logger.is_active():
-            self.emotion_logger.log_emotion(emotion, confidence, selected_model, len(faces))
-        
-        # Draw face rectangles and emotion labels
-        frame_with_annotations = self.camera_handler.draw_face_rectangles(
-            frame.copy(), faces, emotion, confidence
-        )
-        
-        # Update GUI in main thread
-        self.root.after(0, self.update_gui, emotion, confidence, frame_with_annotations)
-        
-        # Record frame if recording
-        if self.video_recorder.is_recording_active():
-            self.video_recorder.write_frame(frame_with_annotations)
+        try:
+            # Check if still streaming
+            if not self.is_streaming:
+                return
+            
+            # Get selected model
+            selected_model = self.main_window.model_var.get()
+            
+            # Detect emotion with error handling
+            try:
+                emotion, confidence, faces = self.model_manager.detect_emotion(selected_model, frame)
+            except Exception as e:
+                print(f"Emotion detection error: {e}")
+                emotion, confidence, faces = "Lỗi phát hiện", 0.0, []
+            
+            # Log emotion data if logging is active
+            if self.emotion_logger.is_active():
+                try:
+                    self.emotion_logger.log_emotion(emotion, confidence, selected_model, len(faces))
+                except Exception as e:
+                    print(f"Logging error: {e}")
+            
+            # Draw face rectangles and emotion labels
+            try:
+                frame_with_annotations = self.camera_handler.draw_face_rectangles(
+                    frame.copy(), faces, emotion, confidence
+                )
+            except Exception as e:
+                print(f"Annotation error: {e}")
+                frame_with_annotations = frame
+            
+            # Update GUI in main thread
+            try:
+                self.root.after(0, self.update_gui, emotion, confidence, frame_with_annotations)
+            except Exception as e:
+                print(f"GUI update scheduling error: {e}")
+            
+            # Record frame if recording
+            if self.video_recorder.is_recording_active():
+                try:
+                    self.video_recorder.write_frame(frame_with_annotations)
+                except Exception as e:
+                    print(f"Video recording error: {e}")
+                    
+        except Exception as e:
+            print(f"Frame processing error: {e}")
     
     def update_gui(self, emotion, confidence, frame):
         """Update GUI with new emotion data and video frame"""
-        # Update emotion information
-        self.emotion_panel.update_emotion_info(emotion, confidence)
-        
-        # Update video display
-        img_tk = self.camera_handler.frame_to_tkinter(frame)
-        self.video_display.update_frame(img_tk)
-    
+        try:
+            # Update emotion information
+            if hasattr(self, 'emotion_panel'):
+                self.emotion_panel.update_emotion_info(emotion, confidence)
+            
+            # Update video display
+            if hasattr(self, 'video_display') and frame is not None:
+                img_tk = self.camera_handler.frame_to_tkinter(frame)
+                if img_tk:
+                    self.video_display.update_frame(img_tk)
+                    
+        except Exception as e:
+            print(f"GUI update error: {e}")
+
     def run(self):
         """Run the application"""
         try:
@@ -383,12 +452,24 @@ Bạn có muốn mở thư mục output?"""
     
     def cleanup(self):
         """Cleanup resources before exit"""
-        if self.is_streaming:
-            self.stop_stream()
-        if self.video_recorder.is_recording_active():
-            self.stop_recording()
-        if self.emotion_logger.is_active():
-            self.emotion_logger.stop_logging()
+        try:
+            print("Cleaning up resources...")
+            
+            if self.is_streaming:
+                self.stop_stream()
+            
+            if self.video_recorder.is_recording_active():
+                self.stop_recording()
+            
+            if self.emotion_logger.is_active():
+                self.emotion_logger.stop_logging()
+            
+            # Force cleanup
+            import gc
+            gc.collect()
+            
+        except Exception as e:
+            print(f"Cleanup error: {e}")
 
 def main():
     """Main entry point"""

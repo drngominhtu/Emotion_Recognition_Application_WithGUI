@@ -479,6 +479,14 @@ def main():
     print("=" * 50)
     
     try:
+        # Show splash screen
+        try:
+            from gui.splash_screen import show_splash_screen
+            show_splash_screen()
+        except ImportError:
+            print("Splash screen not available")
+        
+        # Start main application
         app = EmotionRecognitionApp()
         app.run()
     except Exception as e:

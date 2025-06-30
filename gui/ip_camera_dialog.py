@@ -27,13 +27,34 @@ class IPCameraDialog:
         main_frame = ttk.Frame(self.dialog, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
+        # Header with small logo
+        header_frame = ttk.Frame(main_frame)
+        header_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        # Small logo
+        try:
+            import os
+            from PIL import Image, ImageTk
+            
+            logo_path = os.path.join("img_logo", "logo.png")
+            if os.path.exists(logo_path):
+                img = Image.open(logo_path)
+                img = img.resize((72, 24), Image.Resampling.LANCZOS)  # 72 = 24 * 3
+                logo_photo = ImageTk.PhotoImage(img)
+                
+                logo_label = ttk.Label(header_frame, image=logo_photo)
+                logo_label.image = logo_photo
+                logo_label.pack(side=tk.LEFT, padx=(0, 10))
+        except Exception:
+            pass
+        
         # Title
         title_label = ttk.Label(
-            main_frame,
+            header_frame,
             text="Cấu hình IP Camera",
             font=("Arial", 12, "bold")
         )
-        title_label.pack(pady=(0, 20))
+        title_label.pack(side=tk.LEFT)
         
         # Protocol selection
         protocol_frame = ttk.LabelFrame(main_frame, text="Giao thức", padding="10")

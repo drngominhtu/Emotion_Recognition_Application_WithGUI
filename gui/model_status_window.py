@@ -46,13 +46,34 @@ class ModelStatusWindow:
         main_frame = ttk.Frame(self.window, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
+        # Header with logo
+        header_frame = ttk.Frame(main_frame)
+        header_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Add small logo to header
+        try:
+            import os
+            from PIL import Image, ImageTk
+            
+            logo_path = os.path.join("img_logo", "logo.png")
+            if os.path.exists(logo_path):
+                img = Image.open(logo_path)
+                img = img.resize((96, 32), Image.Resampling.LANCZOS)  # 96 = 32 * 3
+                logo_photo = ImageTk.PhotoImage(img)
+                
+                logo_label = ttk.Label(header_frame, image=logo_photo)
+                logo_label.image = logo_photo
+                logo_label.pack(side=tk.LEFT, padx=(0, 10))
+        except Exception:
+            pass
+        
         # Title
         title_label = ttk.Label(
-            main_frame, 
+            header_frame, 
             text="Trạng thái Models Nhận dạng Cảm xúc",
             font=("Arial", 14, "bold")
         )
-        title_label.pack(pady=(0, 20))
+        title_label.pack(side=tk.LEFT, padx=(0, 10))
         
         # Create treeview for model status
         columns = ("Model", "Status", "Requirements")

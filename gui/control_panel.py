@@ -115,6 +115,15 @@ class ControlPanel:
         )
         self.status_btn.pack(side=tk.LEFT, padx=(0, 10))
         
+        # About button with logo
+        self.about_btn = ttk.Button(
+            button_frame,
+            text="About",
+            width=8,
+            command=self.show_about
+        )
+        self.about_btn.pack(side=tk.LEFT, padx=(0, 10))
+
         # Status display
         status_frame = ttk.Frame(self.control_frame)
         status_frame.grid(row=2, column=0, columnspan=4, pady=(10, 0), sticky=(tk.W, tk.E))
@@ -420,3 +429,16 @@ Sau khi cài xong, khởi động lại ứng dụng để load models mới."""
         
         # Bind camera selection event
         self.camera_combo.bind("<<ComboboxSelected>>", self.on_camera_selected)
+    
+    def show_about(self):
+        """Show about dialog"""
+        try:
+            from .about_dialog import AboutDialog
+            AboutDialog(self.control_frame.winfo_toplevel())
+        except ImportError as e:
+            messagebox.showinfo(
+                "About",
+                "Emotion Recognition App v1.0.0\n\n"
+                "Ứng dụng nhận dạng cảm xúc khuôn mặt realtime\n"
+                "Sử dụng AI và Computer Vision"
+            )
